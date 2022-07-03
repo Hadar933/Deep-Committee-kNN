@@ -63,9 +63,10 @@ def calculate_activations_and_save(dataloader, test_or_train: str, dataset_name:
     shallow_hook = ResNet.layer2[1].register_forward_hook(_get_activation(shallow_layer_name, dataset_name))
     final_shallow, final_deep = torch.tensor([]), torch.tensor([])
     count = 0
-    for (X, y) in tqdm(dataloader):
+    for X, _ in tqdm(dataloader):
+        X = X.to(device)
         count += 1
-        out = ResNet(X.float())
+        out = ResNet(X)
         curr_shallow_act, curr_deep_act = activations[shallow_layer_name], activations[deep_layer_name]
         final_deep = torch.cat((final_deep, curr_deep_act))
         final_shallow = torch.cat((final_shallow, curr_shallow_act))
@@ -89,5 +90,7 @@ class ActivationDataset(Dataset):
     def __getitem__(self, idx: int):
         if idx > self.len: raise IndexError(f"idx={idx}>={self.len}=len")
         deep_act = torch.load(f"deep_activations/{self.dataset_name}_{self.test_or_train}_{idx + 1}")
+        deep_act = deep_act.to(device)
         shallow_act = torch.load(f"shallow_activations/{self.dataset_name}_{self.test_or_train}_{idx + 1}")
+        shallow_act = shallow_act.to(device)
         return torch.nn.functional.normalize(shallow_act), torch.nn.functional.normalize(deep_act)

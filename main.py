@@ -37,8 +37,8 @@ def main():
     train_size = 5000
     regular_class = 'cifar10'
     anomalous_class = 'mnist'
-    calc_reg_activation = False
-    calc_anomal_activation = False
+    calc_reg_activation = True
+    calc_anomal_activation = True
     calculate_knn = False
     calculate_knn_anomalous = False
 
