@@ -1,30 +1,14 @@
 # %% imports
-import os
-from typing import Tuple, Callable, Dict
-
+from typing import Callable
+from Utils import device, ResNet, batch_size, rgb_preprocess, greyscale_preprocess
 from tqdm import tqdm
-import numpy as np
 import torch.nn
-from scipy import ndimage
-from torchvision import transforms, datasets
-from torch.utils.data import Dataset, DataLoader
+from torchvision import datasets
+from torch.utils.data import Dataset
 import torch.nn
-from torchsummary import summary
+
 
 # %% loading ResNet and ImageNet classes
-
-_device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-_ResNet = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=True)
-_ResNet.eval()
-_ResNet.to(_device)
-_batch_size = 100
-
-
-def imagenet_categories():
-    with open("imagenet_classes.txt", "r") as f:
-        categories = [s.strip() for s in f.readlines()]
-    return categories
-
 
 def load_dataloaders(train_size: int):
     """
@@ -32,19 +16,6 @@ def load_dataloaders(train_size: int):
     :param train_size: size of the data you need from the train (for test we take everything)
     :return:
     """
-    greyscale_preprocess = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.Grayscale(num_output_channels=3),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    rgb_preprocess = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
 
     cifar10_train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=rgb_preprocess)
     cifar10_test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=rgb_preprocess)
@@ -52,9 +23,9 @@ def load_dataloaders(train_size: int):
 
     cifar10_sliced_train_data = torch.utils.data.Subset(cifar10_train_data, range(0, train_size))
 
-    cifar10_train_loader = torch.utils.data.DataLoader(cifar10_sliced_train_data, shuffle=True, batch_size=_batch_size)
-    cifar10_test_loader = torch.utils.data.DataLoader(cifar10_test_data, batch_size=_batch_size)
-    mnist_test_loader = torch.utils.data.DataLoader(mnist_test_data, batch_size=_batch_size)
+    cifar10_train_loader = torch.utils.data.DataLoader(cifar10_sliced_train_data, shuffle=True, batch_size=batch_size)
+    cifar10_test_loader = torch.utils.data.DataLoader(cifar10_test_data, batch_size=batch_size)
+    mnist_test_loader = torch.utils.data.DataLoader(mnist_test_data, batch_size=batch_size)
 
     return cifar10_train_loader, cifar10_test_loader, mnist_test_loader
 
@@ -88,13 +59,13 @@ def calculate_activations_and_save(dataloader, test_or_train: str, dataset_name:
     """
     activations = _mnist_activations if dataset_name == 'mnist' else _cifar10_activations
     deep_layer_name, shallow_layer_name = 'deep_conv1', 'shallow_conv2'
-    deep_hook = _ResNet.layer4[1].register_forward_hook(_get_activation(deep_layer_name, dataset_name))
-    shallow_hook = _ResNet.layer2[1].register_forward_hook(_get_activation(shallow_layer_name, dataset_name))
+    deep_hook = ResNet.layer4[1].register_forward_hook(_get_activation(deep_layer_name, dataset_name))
+    shallow_hook = ResNet.layer2[1].register_forward_hook(_get_activation(shallow_layer_name, dataset_name))
     final_shallow, final_deep = torch.tensor([]), torch.tensor([])
     count = 0
     for (X, y) in tqdm(dataloader):
         count += 1
-        out = _ResNet(X.float())
+        out = ResNet(X.float())
         curr_shallow_act, curr_deep_act = activations[shallow_layer_name], activations[deep_layer_name]
         final_deep = torch.cat((final_deep, curr_deep_act))
         final_shallow = torch.cat((final_shallow, curr_shallow_act))

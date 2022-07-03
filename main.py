@@ -32,7 +32,6 @@ def load_activation_dataloaders(calc_activations: bool,
     return cifar10_train_activations_loader, cifar10_test_activations_loader, mnist_test_activations_loader
 
 
-# TODO: probably need to normalize the activations.
 def main():
     k = 3
     train_size = 5000

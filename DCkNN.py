@@ -1,7 +1,6 @@
-import os
 import torch
 from tqdm import tqdm
-from Data_Preprocess import ActivationDataset, calculate_activations_and_save
+from Data_Preprocess import ActivationDataset
 from typing import Dict, Tuple
 
 
