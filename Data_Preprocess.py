@@ -1,6 +1,7 @@
 # %% imports
-from typing import Callable
+from typing import Callable, Dict, Tuple
 from Utils import device, ResNet, batch_size, rgb_preprocess, greyscale_preprocess
+from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn
 from torchvision import datasets
@@ -10,7 +11,7 @@ import torch.nn
 
 # %% loading ResNet and ImageNet classes
 
-def load_dataloaders(train_size: int):
+def load_dataloaders(train_size: int) -> Tuple[DataLoader, DataLoader, DataLoader]:
     """
     loads the relevant regular and anomalous datasets and slices the train set
     :param train_size: size of the data you need from the train (for test we take everything)
@@ -23,15 +24,15 @@ def load_dataloaders(train_size: int):
 
     cifar10_sliced_train_data = torch.utils.data.Subset(cifar10_train_data, range(0, train_size))
 
-    cifar10_train_loader = torch.utils.data.DataLoader(cifar10_sliced_train_data, shuffle=True, batch_size=batch_size)
-    cifar10_test_loader = torch.utils.data.DataLoader(cifar10_test_data, batch_size=batch_size)
-    mnist_test_loader = torch.utils.data.DataLoader(mnist_test_data, batch_size=batch_size)
+    cifar10_train_loader = DataLoader(cifar10_sliced_train_data, shuffle=True, batch_size=batch_size)
+    cifar10_test_loader = DataLoader(cifar10_test_data, batch_size=batch_size)
+    mnist_test_loader = DataLoader(mnist_test_data, batch_size=batch_size)
 
     return cifar10_train_loader, cifar10_test_loader, mnist_test_loader
 
 
-_mnist_activations = {}
-_cifar10_activations = {}
+_mnist_activations: Dict[str, torch.Tensor] = {}
+_cifar10_activations: Dict[str, torch.Tensor] = {}
 
 
 def _get_activation(layer_name: str, dataset_name: str) -> Callable:
@@ -43,7 +44,10 @@ def _get_activation(layer_name: str, dataset_name: str) -> Callable:
     :return:
     """
 
-    def hook(model, input, output):
+    def hook(model, input, output) -> None:
+        """
+        adds the output of the network to the corresponding dictionary
+        """
         if dataset_name == 'mnist':
             _mnist_activations[layer_name] = output.detach()
         elif dataset_name == 'cifar10':
@@ -79,6 +83,10 @@ def calculate_activations_and_save(dataloader, test_or_train: str, dataset_name:
 
 
 class ActivationDataset(Dataset):
+    """
+    A class that represents a dataset of ResNet activations
+    """
+
     def __init__(self, train_dataset_name: str, test_or_train: str) -> None:
         self.dataset_name = train_dataset_name
         self.test_or_train = test_or_train
@@ -87,7 +95,12 @@ class ActivationDataset(Dataset):
     def __len__(self) -> int:
         return self.len
 
-    def __getitem__(self, idx: int):
+    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        loads the corresponding activation and normalizes it
+        :param idx: we load files based on index
+        :return: normalized shallow and deep activation tensors
+        """
         if idx > self.len: raise IndexError(f"idx={idx}>={self.len}=len")
         deep_act = torch.load(f"deep_activations/{self.dataset_name}_{self.test_or_train}_{idx + 1}")
         deep_act = deep_act.to(device)

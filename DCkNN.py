@@ -73,7 +73,7 @@ def committee_kNN_from_all_files(k: int,
     return shallow_ret, deep_ret
 
 
-def load_predictions_and_measure_accuracy() -> Dict[str, Dict[str, torch.Tensor]]:
+def load_predictions_and_measure_accuracy() -> None:
     """
     loads the already calculated predictions and calculates relevant measurements
     :return: a nested dict of the form {ft/der/shallow/deep: {prediction: ,classification: ,accuracy:},... }

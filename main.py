@@ -39,8 +39,8 @@ def main():
     anomalous_class = 'mnist'
     calc_reg_activation = True
     calc_anomal_activation = True
-    calculate_knn = False
-    calculate_knn_anomalous = False
+    calculate_knn = True
+    calculate_knn_anomalous = True
 
     cifar10_train, cifar10_test, mnist_test = load_activation_dataloaders(calc_reg_activation, calc_anomal_activation,
                                                                           anomalous_class, regular_class, train_size)
