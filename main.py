@@ -1,5 +1,6 @@
 from Data_Preprocess import *
 from DCkNN import *
+from matplotlib import pyplot as plt
 
 
 def load_activation_dataloaders(calc_activations: bool,
@@ -32,9 +33,30 @@ def load_activation_dataloaders(calc_activations: bool,
     return cifar10_train_activations_loader, cifar10_test_activations_loader, mnist_test_activations_loader
 
 
+def visualize_results():
+    deep_cifar10, shallow_cifar10, shallow_mnist, deep_mnist = load_predictions()
+    x = range(10000)
+
+    plt.scatter(x, shallow_cifar10.cpu().numpy(), s=0.3)
+    plt.scatter(x, shallow_mnist.cpu().numpy(), s=0.3)
+    plt.title("Shallow Activations")
+    plt.xlabel("# Sample")
+    plt.ylabel("Mean kNN distance from k=3 neighbours")
+    plt.legend(['CIFAR10', 'MNIST'])
+    plt.plot()
+
+    plt.scatter(x, deep_cifar10.cpu().numpy(), s=0.3)
+    plt.scatter(x, deep_mnist.cpu().numpy(), s=0.3)
+    plt.title("Deep Activations")
+    plt.xlabel("# Sample")
+    plt.ylabel(f"Mean kNN distance from k=3 neighbours")
+    plt.legend(['CIFAR10', 'MNIST'])
+    plt.plot()
+
+
 def main():
-    k = 3
-    train_size = 5000
+    k = 2
+    train_size = 7000
     regular_class = 'cifar10'
     anomalous_class = 'mnist'
     calc_reg_activation = True
@@ -47,8 +69,6 @@ def main():
     if calculate_knn: committee_kNN_from_all_files(k, cifar10_train, cifar10_test, regular_class)
     if calculate_knn_anomalous: committee_kNN_from_all_files(k, cifar10_train, mnist_test, anomalous_class)
 
-    load_predictions_and_measure_accuracy()
-
 
 if __name__ == '__main__':
-    ret = main()
+    main()

@@ -2,6 +2,7 @@ import torch
 from tqdm import tqdm
 from Data_Preprocess import ActivationDataset
 from typing import Dict, Tuple
+from Utils import device
 
 
 def kNN(train: torch.Tensor,
@@ -56,13 +57,16 @@ def committee_kNN_from_all_files(k: int,
     """
     :return: classifications of the test data
     """
-    shallow_ret, deep_ret = torch.tensor([]), torch.tensor([])
+    shallow_ret, deep_ret = torch.tensor([], device=device), torch.tensor([], device=device)
     for curr_test_shallow, curr_test_deep in tqdm(test):  # TODO: maybe iterate both reg & anomal using zip(..)
-
-        knn_shallow = {'values': torch.tensor([]), 'indices': torch.tensor([])}
-        knn_deep = {'values': torch.tensor([]), 'indices': torch.tensor([])}
+        curr_test_shallow = curr_test_shallow.to(device)
+        curr_test_deep = curr_test_deep.to(device)
+        knn_shallow = {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)}
+        knn_deep = {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)}
 
         for curr_train_shallow, curr_train_deep in tqdm(train):
+            curr_train_shallow = curr_train_shallow.to(device)
+            curr_train_deep = curr_train_deep.to(device)
             _calc_current_knn_and_append(curr_train_shallow, curr_test_shallow, knn_shallow, k)
             _calc_current_knn_and_append(curr_train_deep, curr_test_deep, knn_deep, k)
 
@@ -73,7 +77,7 @@ def committee_kNN_from_all_files(k: int,
     return shallow_ret, deep_ret
 
 
-def load_predictions_and_measure_accuracy() -> None:
+def load_predictions():
     """
     loads the already calculated predictions and calculates relevant measurements
     :return: a nested dict of the form {ft/der/shallow/deep: {prediction: ,classification: ,accuracy:},... }
@@ -83,4 +87,4 @@ def load_predictions_and_measure_accuracy() -> None:
     shallow_cifar10 = torch.load('predictions/shallow_cifar10')
     shallow_mnist = torch.load('predictions/shallow_mnist')
     deep_mnist = torch.load('predictions/deep_mnist')
-    x = 2
+    return deep_cifar10, shallow_cifar10, shallow_mnist, deep_mnist
