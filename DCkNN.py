@@ -112,5 +112,6 @@ def committee_all_predictions():
         activation = torch.load(f"predictions/{filename}")
         layer, dataset = filename.split("_")
         thres = thresholds[layer]
-        pred = activation <= thres  # False iff Anomalous
+        pred = activation >= thres  # True iff Anomalous
         predictions[filename] = pred
+    return predictions
