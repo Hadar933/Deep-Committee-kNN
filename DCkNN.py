@@ -1,20 +1,26 @@
+import scipy.spatial.distance
 import torch
 from tqdm import tqdm
 from Data_Preprocess import ActivationDataset
 from typing import Dict, Tuple
-from Utils import device
+from Utils import device, emd_3d
 
 
 def kNN(train: torch.Tensor,
         test: torch.Tensor,
-        k: int) -> torch.Tensor:
+        k: int,
+        is_shallow: bool) -> torch.Tensor:
     """
     for a given test batch, finds the pairwise knn for every sample in the given train batch
     :param train: a batch from the train set
     :param test: a batch from the test set
     :param k: neighbours to consider (hyper parameter)
+    :param is_shallow:
     :return: pairwise k-nearest-neighbours
     """
+    if is_shallow:  # reducing channels
+        test, train = emd_3d(test, train)
+
     dist = torch.cdist(test.flatten(1), train.flatten(1))
     knn = dist.topk(k, largest=False)
     return knn
@@ -23,12 +29,13 @@ def kNN(train: torch.Tensor,
 def _calc_current_knn_and_append(curr_train: torch.Tensor,
                                  curr_test: torch.Tensor,
                                  dict_to_update: Dict[str, torch.Tensor],
-                                 k: int) -> None:
+                                 k: int,
+                                 is_shallow: bool) -> None:
     """
     for a given train batch and test batch (both of specific type - deep/shallow), calculated the pairwise kNN
     and appends both values and indices to a provided return tensor
     """
-    curr_knn = kNN(curr_train, curr_test, k)
+    curr_knn = kNN(curr_train, curr_test, k, is_shallow)
     values, indices = curr_knn.values, curr_knn.indices
     dict_to_update['values'] = torch.cat((dict_to_update['values'], values), 1)
     dict_to_update['indices'] = torch.cat((dict_to_update['indices'], indices), 1)
@@ -67,8 +74,8 @@ def committee_kNN_from_all_files(k: int,
         for curr_train_shallow, curr_train_deep in tqdm(train):
             curr_train_shallow = curr_train_shallow.to(device)
             curr_train_deep = curr_train_deep.to(device)
-            _calc_current_knn_and_append(curr_train_shallow, curr_test_shallow, knn_shallow, k)
-            _calc_current_knn_and_append(curr_train_deep, curr_test_deep, knn_deep, k)
+            _calc_current_knn_and_append(curr_train_shallow, curr_test_shallow, knn_shallow, k, True)
+            _calc_current_knn_and_append(curr_train_deep, curr_test_deep, knn_deep, k, False)
 
         shallow_ret = torch.cat((shallow_ret, _get_predictions(knn_shallow, k)))
         deep_ret = torch.cat((deep_ret, _get_predictions(knn_deep, k)))

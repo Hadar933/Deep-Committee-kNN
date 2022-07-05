@@ -1,3 +1,5 @@
+import torch
+
 from Data_Preprocess import *
 from DCkNN import *
 from matplotlib import pyplot as plt
@@ -43,7 +45,7 @@ def visualize_results():
     plt.xlabel("# Sample")
     plt.ylabel("Mean kNN distance from k=3 neighbours")
     plt.legend(['CIFAR10', 'MNIST'])
-    plt.plot()
+    plt.show()
 
     plt.scatter(x, deep_cifar10.cpu().numpy(), s=0.3)
     plt.scatter(x, deep_mnist.cpu().numpy(), s=0.3)
@@ -51,16 +53,16 @@ def visualize_results():
     plt.xlabel("# Sample")
     plt.ylabel(f"Mean kNN distance from k=3 neighbours")
     plt.legend(['CIFAR10', 'MNIST'])
-    plt.plot()
+    plt.show()
 
 
 def main():
     k = 2
-    train_size = 7000
+    train_size = 5000
     regular_class = 'cifar10'
     anomalous_class = 'mnist'
-    calc_reg_activation = True
-    calc_anomal_activation = True
+    calc_reg_activation = False
+    calc_anomal_activation = False
     calculate_knn = True
     calculate_knn_anomalous = True
 
