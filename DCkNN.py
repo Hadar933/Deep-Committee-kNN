@@ -1,8 +1,10 @@
+import os
+
 import scipy.spatial.distance
 import torch
 from tqdm import tqdm
 from Data_Preprocess import ActivationDataset
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 from Utils import device, emd_3d
 
 
@@ -18,9 +20,8 @@ def kNN(train: torch.Tensor,
     :param is_shallow:
     :return: pairwise k-nearest-neighbours
     """
-    if is_shallow:  # reducing channels
+    if is_shallow:  # shallow layers have shape (c,h,w) so we need a different metric for distance
         test, train = emd_3d(test, train)
-
     dist = torch.cdist(test.flatten(1), train.flatten(1))
     knn = dist.topk(k, largest=False)
     return knn
@@ -95,3 +96,21 @@ def load_predictions():
     shallow_mnist = torch.load('predictions/shallow_mnist')
     deep_mnist = torch.load('predictions/deep_mnist')
     return deep_cifar10, shallow_cifar10, shallow_mnist, deep_mnist
+
+
+def find_best_thresholds():
+    # TODO
+    return {'deep': 6.47, 'shallow': 5000}
+
+
+def committee_all_predictions():
+    # loading predictions:
+    thresholds = find_best_thresholds()
+    predictions = {}
+    files = os.listdir('predictions')
+    for filename in files:
+        activation = torch.load(f"predictions/{filename}")
+        layer, dataset = filename.split("_")
+        thres = thresholds[layer]
+        pred = activation <= thres  # False iff Anomalous
+        predictions[filename] = pred

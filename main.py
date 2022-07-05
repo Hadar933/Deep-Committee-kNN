@@ -37,7 +37,7 @@ def load_activation_dataloaders(calc_activations: bool,
 
 def visualize_results():
     deep_cifar10, shallow_cifar10, shallow_mnist, deep_mnist = load_predictions()
-    x = range(10000)
+    x = range(10000) # test size
 
     plt.scatter(x, shallow_cifar10.cpu().numpy(), s=0.3)
     plt.scatter(x, shallow_mnist.cpu().numpy(), s=0.3)
@@ -73,4 +73,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    committee_all_predictions()

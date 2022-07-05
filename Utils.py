@@ -32,25 +32,18 @@ rgb_preprocess = transforms.Compose([
 ])
 
 
-# def cumsum_3d(a):
-#     a = torch.cumsum(a, -1)
-#     a = torch.cumsum(a, -2)
-#     a = torch.cumsum(a, -3)
-#     return a
-#
-#
-# def norm_3d(a):
-#     return a / torch.sum(a, dim=(-1, -2, -3), keepdim=True)
-#
-
-def emd_3d(a, b):
-    # a = norm_3d(a)
-    # b = norm_3d(b)
+def emd_3d(test, train):
+    """
+    this is a version of earth movers distance that is performed on a shallow activation
+    :param test: test batch with shape (b,c,h,w)
+    :param train: train batch with the same shape
+    :return:
+    """
     for i in [-1, -2, -3]:
-        a = torch.cumsum(a, i)
-        b = torch.cumsum(b, i)
-    # return torch.mean(torch.square(a - b), dim=(-1, -2, -3))
-    return a,b
+        test = torch.cumsum(test, i)
+        train = torch.cumsum(train, i)
+    return test, train
+
 
 def imagenet_categories():
     with open("imagenet_classes.txt", "r") as f:
