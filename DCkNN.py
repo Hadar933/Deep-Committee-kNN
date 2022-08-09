@@ -1,9 +1,8 @@
 import os
 import torch
 from tqdm import tqdm
-from Data_Preprocess import ActivationDataset
-from typing import Dict, Tuple, List
-from Utils import device, emd_3d
+from typing import Dict, Tuple
+from Utils import device, emd_3d, ANOMAL_DATASETS
 
 
 def kNN(train: torch.Tensor,
@@ -54,9 +53,10 @@ def _get_predictions(knn_results: Dict[str, torch.Tensor],
 
 
 def committee_kNN_from_all_files(k: int,
-                                 train: ActivationDataset,
-                                 test: ActivationDataset,
-                                 dataset: str
+                                 train,
+                                 test,
+                                 dataset: str,
+                                 is_anomalous: bool
                                  ) -> Tuple[torch.Tensor, torch.Tensor]:
     """
     :return: classifications of the test data
@@ -86,9 +86,9 @@ def committee_kNN_from_all_files(k: int,
         mid_ret = torch.cat((mid_ret, _get_predictions(knn_mid, k)))
         deep_ret = torch.cat((deep_ret, _get_predictions(knn_deep, k)))
 
-    torch.save(deep_ret, f'predictions/deep_{dataset}')
-    torch.save(mid_ret, f'predictions/mid_{dataset}')
-    torch.save(shallow_ret, f'predictions/shallow_{dataset}')
+    torch.save(deep_ret, f'predictions/deep_{dataset}_{"anomal" if is_anomalous else "regular"}')
+    torch.save(mid_ret, f'predictions/mid_{dataset}_{"anomal" if is_anomalous else "regular"}')
+    torch.save(shallow_ret, f'predictions/shallow_{dataset}_{"anomal" if is_anomalous else "regular"}')
     return shallow_ret, mid_ret, deep_ret
 
 
@@ -103,7 +103,7 @@ def classify_based_on_knn_distance(thresholds) -> Tuple[Dict[str, torch.ByteTens
     files = os.listdir('predictions')
     for filename in files:
         activation = torch.load(f"predictions/{filename}")
-        layer, dataset = filename.split("_")
+        layer, dataset, is_anomalous = filename.split("_")
         thres = thresholds[layer]
         pred = activation <= thres  # True iff NOT Anomalous
         if dataset in ANOMAL_DATASETS:

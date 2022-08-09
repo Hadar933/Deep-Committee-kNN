@@ -1,6 +1,6 @@
 # %% imports
-from typing import Callable, Dict, Tuple
-from Utils import device, ResNet, batch_size, rgb_preprocess, greyscale_preprocess
+from typing import Callable
+from Utils import device, ResNet, batch_size, rgb_preprocess, greyscale_preprocess, ANOMAL_DATASETS
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import torch.nn
@@ -10,26 +10,49 @@ import torch.nn
 import os
 
 
-def load_dataloaders(train_size: int, test_size: int, anomal_class: str, reg_class: str):
+def load_dataloaders(train_size: int, test_size: int, anomal_class: str, reg_class: str, is_one_vs_other: bool, *args):
     """
     loads the relevant regular and anomalous datasets and slices the train set
-    :param train_size: size of the data you need from the train (for test we take everything)
+    :param is_one_vs_other: True iff we want to use cifar10 as one vs other (one class = anomalous, the other = regular)
+    :param reg_class: a string that represents the name of the regular class
+    :param anomal_class: a string that represents the name of the anomalous class
+    :param test_size: we perform the algorithm based on this much test samples
+    :param train_size: we perform the algorithm based on this much train samples
+    :param args: when is_one_vs_other == True, args[0] is an int associated with the anomal classes in one-vs-other,
     :return:
     """
-    if reg_class != 'cifar10':
-        raise ValueError(f"Unsupported regular data set ({reg_class})")
-
-    if reg_class == 'cifar10':
+    if is_one_vs_other:
+        anomal_target = args[0][0]
+        if anomal_class != 'cifar10cls' or reg_class != 'cifar10':
+            raise ValueError(f"One-vs-Other does not support reg=({reg_class}), anomal=({anomal_class})")
         reg_train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=rgb_preprocess)
         reg_test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=rgb_preprocess)
+        anomal_test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=rgb_preprocess)
 
-    if anomal_class not in ANOMAL_DATASETS:
-        raise ValueError(f"Unsupported anomalous data set ({anomal_class})")
+        all_other_classes_test = reg_test_data.data[torch.tensor(reg_test_data.targets) != anomal_target]
+        all_other_classes_train = reg_train_data.data[torch.tensor(reg_train_data.targets) != anomal_target]
+        one_anomal_class_test = reg_test_data.data[torch.tensor(reg_test_data.targets) == anomal_target]
 
-    elif anomal_class == 'mnist':
-        anomal_test_data = datasets.MNIST(root='./data', train=False, download=True, transform=greyscale_preprocess)
-    elif anomal_class == 'caltech256':
-        anomal_test_data = datasets.Caltech256(root='./data', download=True, transform=rgb_preprocess)
+        reg_train_data.data = all_other_classes_train
+        reg_test_data.data = all_other_classes_test
+        anomal_test_data.data = one_anomal_class_test
+
+    else:
+
+        if reg_class != 'cifar10':
+            raise ValueError(f"Unsupported regular data set ({reg_class})")
+
+        if reg_class == 'cifar10':
+            reg_train_data = datasets.CIFAR10(root='./data', train=True, download=True, transform=rgb_preprocess)
+            reg_test_data = datasets.CIFAR10(root='./data', train=False, download=True, transform=rgb_preprocess)
+
+        if anomal_class not in ANOMAL_DATASETS:
+            raise ValueError(f"Unsupported anomalous data set ({anomal_class})")
+
+        elif anomal_class == 'mnist':
+            anomal_test_data = datasets.MNIST(root='./data', train=False, download=True, transform=greyscale_preprocess)
+        elif anomal_class == 'caltech256':
+            anomal_test_data = datasets.Caltech256(root='./data', download=True, transform=rgb_preprocess)
 
     reg_train_data = torch.utils.data.Subset(reg_train_data, range(0, train_size))
     reg_test_data = torch.utils.data.Subset(reg_test_data, range(0, test_size))
@@ -68,6 +91,7 @@ def _get_activation(layer_name: str, dataset_name: str, is_anomal: bool) -> Call
 def calculate_activations_and_save(dataloader, test_or_train: str, dataset_name: str) -> None:
     is_anomal = True if dataset_name in ANOMAL_DATASETS else False
     activations = _anomal_activations if is_anomal else _regular_activations
+    anomal_suffix = "anomal" if is_anomal else "regular"
 
     deep_layer_name, mid_layer_name, shallow_layer_name = 'deep_conv1', 'mid_conv1', 'shallow_conv2'
 
@@ -91,9 +115,10 @@ def calculate_activations_and_save(dataloader, test_or_train: str, dataset_name:
         final_mid = torch.cat((final_mid, curr_mid_act))
         final_shallow = torch.cat((final_shallow, curr_shallow_act))
         if count % 10 == 0:  # saving every 10 iterations (=batches) and re-initializing
-            torch.save(final_deep, f'deep_activations/{dataset_name}_{test_or_train}_{count // 10}')
-            torch.save(final_mid, f'mid_activations/{dataset_name}_{test_or_train}_{count // 10}')
-            torch.save(final_shallow, f'shallow_activations/{dataset_name}_{test_or_train}_{count // 10}')
+            torch.save(final_deep, f'deep_activations/{dataset_name}_{test_or_train}_{anomal_suffix}_{count // 10}')
+            torch.save(final_mid, f'mid_activations/{dataset_name}_{test_or_train}_{anomal_suffix}_{count // 10}')
+            torch.save(final_shallow,
+                       f'shallow_activations/{dataset_name}_{test_or_train}_{anomal_suffix}_{count // 10}')
             final_shallow, final_mid, final_deep = torch.tensor([]), torch.tensor([]), torch.tensor([])
             final_deep = final_deep.to(device)
             final_mid = final_mid.to(device)
@@ -104,11 +129,14 @@ def calculate_activations_and_save(dataloader, test_or_train: str, dataset_name:
 
 
 class ActivationDataset(Dataset):
-    def __init__(self, train_dataset_name: str, test_or_train: str) -> None:
+    def __init__(self, train_dataset_name: str, test_or_train: str, is_anomalous: bool) -> None:
         self.dataset_name = train_dataset_name
         self.test_or_train = test_or_train
+        self.is_anomalous = is_anomalous
+        self.anomal_suffix = "anomal" if is_anomalous else "regular"
         all_files = os.listdir('deep_activations')  # just to get length
-        test_len = len([t for t in all_files if 'test' in t and 'mnist' in t])
+        test_len = len(
+            [t for t in all_files if 'test' in t and self.anomal_suffix in t])  # TODO: make sure this works
         train_len = len([t for t in all_files if 'train' in t])
         self.len = test_len if self.test_or_train == 'test' else train_len
 
@@ -117,11 +145,13 @@ class ActivationDataset(Dataset):
 
     def __getitem__(self, idx: int):
         if idx >= self.len: raise IndexError(f"idx={idx}>={self.len}=len")
-        deep_act = torch.load(f"deep_activations/{self.dataset_name}_{self.test_or_train}_{idx + 1}")
+        deep_act = torch.load(
+            f"deep_activations/{self.dataset_name}_{self.test_or_train}_{self.anomal_suffix}_{idx + 1}")
         deep_act = deep_act.to(device)
-        mid_act = torch.load(f"mid_activations/{self.dataset_name}_{self.test_or_train}_{idx + 1}")
+        mid_act = torch.load(f"mid_activations/{self.dataset_name}_{self.test_or_train}_{self.anomal_suffix}_{idx + 1}")
         mid_act = mid_act.to(device)
-        shallow_act = torch.load(f"shallow_activations/{self.dataset_name}_{self.test_or_train}_{idx + 1}")
+        shallow_act = torch.load(
+            f"shallow_activations/{self.dataset_name}_{self.test_or_train}_{self.anomal_suffix}_{idx + 1}")
         shallow_act = shallow_act.to(device)
         return torch.nn.functional.normalize(shallow_act), torch.nn.functional.normalize(
             mid_act), torch.nn.functional.normalize(deep_act)
