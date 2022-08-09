@@ -108,7 +108,7 @@ def main():
     train_size = 1000
     test_size = 1000
     regular_class = 'cifar10'
-    anomalous_class = 'mnist'
+    anomalous_class = 'caltech101'
 
     calc_reg_activation = True
     calc_anomal_activation = True

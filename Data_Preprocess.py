@@ -51,8 +51,8 @@ def load_dataloaders(train_size: int, test_size: int, anomal_class: str, reg_cla
 
         elif anomal_class == 'mnist':
             anomal_test_data = datasets.MNIST(root='./data', train=False, download=True, transform=greyscale_preprocess)
-        elif anomal_class == 'caltech256':
-            anomal_test_data = datasets.Caltech256(root='./data', download=True, transform=rgb_preprocess)
+        elif anomal_class == 'caltech101':
+            anomal_test_data = datasets.Caltech101(root='./data', download=True, transform=rgb_preprocess)
 
     reg_train_data = torch.utils.data.Subset(reg_train_data, range(0, train_size))
     reg_test_data = torch.utils.data.Subset(reg_test_data, range(0, test_size))
