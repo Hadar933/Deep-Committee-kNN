@@ -86,9 +86,10 @@ def committee_kNN_from_all_files(k: int,
         mid_ret = torch.cat((mid_ret, _get_predictions(knn_mid, k)))
         deep_ret = torch.cat((deep_ret, _get_predictions(knn_deep, k)))
 
-    torch.save(deep_ret, f'predictions/deep_{dataset}_{"anomal" if is_anomalous else "regular"}')
-    torch.save(mid_ret, f'predictions/mid_{dataset}_{"anomal" if is_anomalous else "regular"}')
-    torch.save(shallow_ret, f'predictions/shallow_{dataset}_{"anomal" if is_anomalous else "regular"}')
+    anomal_suffix = "anomal" if is_anomalous else "regular"
+    torch.save(deep_ret, f'predictions/deep_{dataset}_{anomal_suffix}')
+    torch.save(mid_ret, f'predictions/mid_{dataset}_{anomal_suffix}')
+    torch.save(shallow_ret, f'predictions/shallow_{dataset}_{anomal_suffix}')
     return shallow_ret, mid_ret, deep_ret
 
 

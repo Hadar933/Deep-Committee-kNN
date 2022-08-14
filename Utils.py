@@ -16,7 +16,7 @@ ResNet.to(device)
 
 batch_size = 100
 
-ANOMAL_DATASETS = ['mnist', 'caltech101', 'cifar10cls']  # add more if needed...
+ANOMAL_DATASETS = ['mnist', 'caltech101']  # add more if needed...
 
 if not os.path.isdir('predictions'): os.mkdir('predictions')
 if not os.path.isdir('deep_activations'): os.mkdir('deep_activations')

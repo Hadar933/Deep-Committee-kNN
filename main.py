@@ -64,11 +64,11 @@ def load_activation_dataloaders(calc_activations: bool,
                                                                              regular_class, one_vs_other, args)
 
     if calc_activations:
-        calculate_activations_and_save(reg_train_loader, 'train', regular_class)
-        calculate_activations_and_save(reg_test_loader, 'test', regular_class)
+        calculate_activations_and_save(reg_train_loader, 'train', regular_class, False)
+        calculate_activations_and_save(reg_test_loader, 'test', regular_class, False)
 
     if calc_anomal_activations:  # the anomalous is only used for testing
-        calculate_activations_and_save(anomal_test_loader, 'test', anomalous_class)
+        calculate_activations_and_save(anomal_test_loader, 'test', anomalous_class, True)
 
     reg_train_activations_loader = ActivationDataset(regular_class, 'train', False)
     reg_test_activations_loader = ActivationDataset(regular_class, 'test', False)
@@ -77,7 +77,7 @@ def load_activation_dataloaders(calc_activations: bool,
     return reg_train_activations_loader, reg_test_activations_loader, anomal_test_activations_loader
 
 
-def visualize_results(anomal_class, reg_class, k):
+def visualize_results(anomal_class: str, reg_class: str, k: int):
     deep_reg = torch.load(f'predictions/deep_{reg_class}_regular')
     mid_reg = torch.load(f'predictions/mid_{reg_class}_regular')
     shal_reg = torch.load(f'predictions/shallow_{reg_class}_regular')
@@ -107,15 +107,15 @@ def main():
     k = 2
     train_size = 1000
     test_size = 1000
-    regular_class = 'cifar10'
-    anomalous_class = 'caltech101'
+    regular_class = 'mnistcls'
+    anomalous_class = 'mnist'
 
     calc_reg_activation = True
     calc_anomal_activation = True
 
-    use_one_vs_other = False
-    args = 0 if use_one_vs_other else None
-    if use_one_vs_other: anomalous_class = f'cifar10cls'
+    use_one_vs_other = True
+    args = 1 if use_one_vs_other else None
+    # if use_one_vs_other: anomalous_class = 'cifar10'
 
     calculate_knn = True
     calculate_knn_anomalous = True
