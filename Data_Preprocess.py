@@ -102,8 +102,8 @@ def calculate_activations_and_save(dataloader, test_or_train: str, dataset_name:
     deep_layer_name, mid_layer_name, shallow_layer_name = 'deep_conv1', 'mid_conv1', 'shallow_conv2'
 
     deep_hook = ResNet.avgpool.register_forward_hook(_get_activation(deep_layer_name, dataset_name, is_anomal))
-    mid_hook = ResNet.layer4[0].register_forward_hook(_get_activation(mid_layer_name, dataset_name, is_anomal))
-    shallow_hook = ResNet.layer2[1].register_forward_hook(_get_activation(shallow_layer_name, dataset_name, is_anomal))
+    mid_hook = ResNet.layer4[1].register_forward_hook(_get_activation(mid_layer_name, dataset_name, is_anomal))
+    shallow_hook = ResNet.layer4[0].register_forward_hook(_get_activation(shallow_layer_name, dataset_name, is_anomal))
 
     final_shallow, final_mid, final_deep = torch.tensor([]), torch.tensor([]), torch.tensor([])
     final_deep = final_deep.to(device)

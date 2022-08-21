@@ -5,7 +5,6 @@ from typing import Dict, Tuple
 from Utils import device, emd_3d, ANOMAL_DATASETS
 
 
-
 def kNN(train: torch.Tensor,
         test: torch.Tensor,
         k: int,

@@ -98,18 +98,23 @@ def visualize_results(anomal_class: str, reg_class: str, k: int, test_size):
         plt.show()
 
 
-def load_activations(anomal_class, reg_class):
+def load_activations(anomal_class, reg_class, to_cpu: bool):
     deep_reg = torch.load(f'predictions/deep_{reg_class}_regular')
     mid_reg = torch.load(f'predictions/mid_{reg_class}_regular')
     shal_reg = torch.load(f'predictions/shallow_{reg_class}_regular')
     deep_anomal = torch.load(f'predictions/deep_{anomal_class}_anomal')
     mid_anomal = torch.load(f'predictions/mid_{anomal_class}_anomal')
     shal_anomal = torch.load(f'predictions/shallow_{anomal_class}_anomal')
-    return deep_anomal, deep_reg, mid_anomal, mid_reg, shal_anomal, shal_reg
+    if to_cpu:
+        return deep_anomal.cpu(), deep_reg.cpu(), mid_anomal.cpu(), mid_reg.cpu(), shal_anomal.cpu(), shal_reg.cpu()
+    else:
+        return deep_anomal, deep_reg, mid_anomal, mid_reg, shal_anomal, shal_reg
 
 
 def get_roc_curve(anomal_class: str, reg_class: str):
-    deep_anomal, deep_reg, mid_anomal, mid_reg, shallow_anomal, shallow_reg = load_activations(anomal_class, reg_class)
+    deep_anomal, deep_reg, mid_anomal, mid_reg, shallow_anomal, shallow_reg = load_activations(anomal_class, reg_class,
+                                                                                               True)
+
     anomal_size, regular_size = deep_anomal.shape, deep_reg.shape
     # 1 for anomal, 0 for regular
     y_true = torch.cat((torch.ones(anomal_size), torch.zeros(regular_size)))
@@ -150,6 +155,9 @@ def get_roc_curve(anomal_class: str, reg_class: str):
     plt.plot(mid_fpr, mid_tpr)
     plt.plot(shallow_fpr, shallow_tpr)
     plt.plot(fpr, tpr)
+    plt.xlabel("FPR")
+    plt.ylabel("TPR")
+    plt.title("ROC Curve")
     plt.legend([f"Deep {roc_auc_score(y_true, deep_pred):.4f}",
                 f"Mid {roc_auc_score(y_true, mid_pred):.4f}",
                 f"Shallow {roc_auc_score(y_true, shallow_pred):.4f}",
@@ -161,10 +169,10 @@ def get_roc_curve(anomal_class: str, reg_class: str):
 
 def main(args):
     k = 2
-    train_size = 1000
+    train_size = 5000
     test_size = 1000
-    regular_class = 'mnistcls'
-    anomalous_class = 'mnist'
+    regular_class = 'cifar10cls'
+    anomalous_class = 'cifar10'
 
     calc_reg_activation = True
     calc_anomal_activation = True
@@ -176,12 +184,12 @@ def main(args):
     calculate_knn = True
     calculate_knn_anomalous = True
 
-    visualize = True
+    visualize = False
 
     do_ROC = True
 
     # TODO: remove from here once done testing
-    get_roc_curve(anomalous_class, regular_class)
+    # get_roc_curve(anomalous_class, regular_class)
 
     print("        Running with the following setup:")
     print(tabulate([['Regular Data', regular_class],
@@ -207,7 +215,7 @@ def main(args):
 
     if visualize: visualize_results(anomalous_class, regular_class, k, test_size)
 
-    if do_ROC: find_hyperparams_and_plot_ROC(anomalous_class, regular_class)
+    if do_ROC: get_roc_curve(anomalous_class, regular_class)
 
 
 if __name__ == '__main__':
