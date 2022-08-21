@@ -5,6 +5,7 @@ from typing import Dict, Tuple
 from Utils import device, emd_3d, ANOMAL_DATASETS
 
 
+
 def kNN(train: torch.Tensor,
         test: torch.Tensor,
         k: int,
@@ -99,6 +100,7 @@ def classify_based_on_knn_distance(thresholds) -> Tuple[Dict[str, torch.ByteTens
     it does that for every one of the activation maps.
     :return: anomalous and regular classifications
     """
+    # TODO: make sure this func still works
     anomal_classifications = {}
     reg_classifications = {}
     files = os.listdir('predictions')

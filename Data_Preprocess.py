@@ -58,9 +58,12 @@ def load_dataloaders(train_size: int, test_size: int, anomal_class: str, reg_cla
         elif anomal_class == 'caltech101':
             anomal_test_data = datasets.Caltech101(root='./data', download=True, transform=rgb_preprocess)
 
-    reg_train_data = torch.utils.data.Subset(reg_train_data, range(0, train_size))
-    reg_test_data = torch.utils.data.Subset(reg_test_data, range(0, test_size))
-    anomal_test_data = torch.utils.data.Subset(anomal_test_data, range(0, test_size))
+    if len(reg_train_data.data) > train_size:
+        reg_train_data = torch.utils.data.Subset(reg_train_data, range(0, train_size))
+    if len(reg_test_data.data) > test_size:
+        reg_test_data = torch.utils.data.Subset(reg_test_data, range(0, test_size))
+    if len(anomal_test_data.data) > test_size:
+        anomal_test_data = torch.utils.data.Subset(anomal_test_data, range(0, test_size))
 
     reg_train_loader = torch.utils.data.DataLoader(reg_train_data, shuffle=True, batch_size=batch_size)
     reg_test_loader = torch.utils.data.DataLoader(reg_test_data, batch_size=batch_size)

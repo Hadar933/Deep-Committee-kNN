@@ -1,10 +1,9 @@
 import torch
-from matplotlib import pyplot as plt
 from torchvision import transforms
 import os
 import gc
-# from DCkNN import classify_based_on_knn_distance, majority_vote
 from tabulate import tabulate
+
 
 gc.collect()
 torch.cuda.empty_cache()
@@ -56,8 +55,8 @@ def score_prediction(anomal_pred, reg_pred):
     FP = reg_pred[~reg_pred]  # said F and it is T (wrong reg)
     TN = anomal_pred[~anomal_pred]  # said F and it is F (correct_anomal)
     FN = anomal_pred[anomal_pred]  # said T and it is F (wrong_anomal)
-    print(tabulate([['Regular (P)', len(TP), len(FP)],
-                    ['Anomal  (N)', len(FN), len(TN)]],
-                   headers=['Pred/Real', 'Regular (P)', 'Anomal (N)']))
+    # print(tabulate([['Regular (P)', len(TP), len(FP)],
+    #                 ['Anomal  (N)', len(FN), len(TN)]],
+    #                headers=['Pred/Real', 'Regular (P)', 'Anomal (N)']))
 
     return len(TP), len(FP), len(TN), len(FN)
