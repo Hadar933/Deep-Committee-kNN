@@ -7,11 +7,14 @@ import torch.nn
 from torchvision import datasets
 from torch.utils.data import Dataset
 import os
+from PIL import Image
 
 
-def load_dataloaders(train_size: int, test_size: int, anomal_class: str, reg_class: str, is_one_vs_other: bool, *args):
+def load_dataloaders(train_size: int, test_size: int, anomal_class: str, reg_class: str, is_one_vs_other: bool,
+                     mv_net: bool, *args):
     """
     loads the relevant regular and anomalous datasets and slices the train set
+    :param mv_net: true iff we want to load that specific dataset
     :param is_one_vs_other: True iff we want to use cifar10 as one vs other (one class = anomalous, the other = regular)
     :param reg_class: a string that represents the name of the regular class
     :param anomal_class: a string that represents the name of the anomalous class
@@ -42,6 +45,32 @@ def load_dataloaders(train_size: int, test_size: int, anomal_class: str, reg_cla
         reg_train_data.data = one_regular_class_train
         reg_test_data.data = one_regular_class_test
         anomal_test_data.data = all_other_classes_test
+
+        if len(reg_train_data.data) > train_size:
+            reg_train_data = torch.utils.data.Subset(reg_train_data, range(0, train_size))
+        if len(reg_test_data.data) > test_size:
+            reg_test_data = torch.utils.data.Subset(reg_test_data, range(0, test_size))
+        if len(anomal_test_data.data) > test_size:
+            anomal_test_data = torch.utils.data.Subset(anomal_test_data, range(0, test_size))
+
+    elif mv_net:
+        # in this case we ignore input sizes and set it up manually:
+        reg_mvnet = MVNetDataset(
+            "G:\\My Drive\\Master\\Year 1\\Applied Deep Learning\\Deep-Committee-kNN\\transistor\\NORMAL", False)
+        reg_mvnet_train_size = int(0.8 * len(reg_mvnet))
+        reg_mvnet_test_size = len(reg_mvnet) - reg_mvnet_train_size
+
+        reg_train_data, reg_test_data = torch.utils.data.random_split(reg_mvnet, [reg_mvnet_train_size, reg_mvnet_test_size])
+
+        anomal_test_data = MVNetDataset(
+            "G:\\My Drive\\Master\\Year 1\\Applied Deep Learning\\Deep-Committee-kNN\\transistor\\ANOMAL", True)
+        if len(reg_train_data) > train_size:
+            reg_train_data = torch.utils.data.Subset(reg_train_data, range(0, train_size))
+        if len(reg_test_data) > test_size:
+            reg_test_data = torch.utils.data.Subset(reg_test_data, range(0, test_size))
+        if len(anomal_test_data) > test_size:
+            anomal_test_data = torch.utils.data.Subset(anomal_test_data, range(0, test_size))
+
     else:
         if reg_class != 'cifar10':
             raise ValueError(f"Unsupported regular data set ({reg_class})")
@@ -58,12 +87,12 @@ def load_dataloaders(train_size: int, test_size: int, anomal_class: str, reg_cla
         elif anomal_class == 'caltech101':
             anomal_test_data = datasets.Caltech101(root='./data', download=True, transform=rgb_preprocess)
 
-    if len(reg_train_data.data) > train_size:
-        reg_train_data = torch.utils.data.Subset(reg_train_data, range(0, train_size))
-    if len(reg_test_data.data) > test_size:
-        reg_test_data = torch.utils.data.Subset(reg_test_data, range(0, test_size))
-    if len(anomal_test_data.data) > test_size:
-        anomal_test_data = torch.utils.data.Subset(anomal_test_data, range(0, test_size))
+        if len(reg_train_data.data) > train_size:
+            reg_train_data = torch.utils.data.Subset(reg_train_data, range(0, train_size))
+        if len(reg_test_data.data) > test_size:
+            reg_test_data = torch.utils.data.Subset(reg_test_data, range(0, test_size))
+        if len(anomal_test_data.data) > test_size:
+            anomal_test_data = torch.utils.data.Subset(anomal_test_data, range(0, test_size))
 
     reg_train_loader = torch.utils.data.DataLoader(reg_train_data, shuffle=True, batch_size=batch_size)
     reg_test_loader = torch.utils.data.DataLoader(reg_test_data, batch_size=batch_size)
@@ -99,39 +128,38 @@ def calculate_activations_and_save(dataloader, test_or_train: str, dataset_name:
     activations = _anomal_activations if is_anomal else _regular_activations
     anomal_suffix = "anomal" if is_anomal else "regular"
 
-    deep_layer_name, mid_layer_name, shallow_layer_name = 'deep_conv1', 'mid_conv1', 'shallow_conv2'
+    names_and_layers_dict = {
+        'layer1_block0': {'hook': ResNet.layer1[0], 'activation': torch.tensor([])},
+        'layer1_block1': {'hook': ResNet.layer1[1], 'activation': torch.tensor([])},
+        'layer2_block0': {'hook': ResNet.layer2[0], 'activation': torch.tensor([])},
+        'layer2_block1': {'hook': ResNet.layer2[1], 'activation': torch.tensor([])},
+        'layer3_block0': {'hook': ResNet.layer3[0], 'activation': torch.tensor([])},
+        'layer3_block1': {'hook': ResNet.layer3[1], 'activation': torch.tensor([])},
+        'layer4_block0': {'hook': ResNet.layer4[0], 'activation': torch.tensor([])},
+        'layer4_block1': {'hook': ResNet.layer4[1], 'activation': torch.tensor([])},
+        'avgpool': {'hook': ResNet.avgpool, 'activation': torch.tensor([])}}
 
-    deep_hook = ResNet.avgpool.register_forward_hook(_get_activation(deep_layer_name, dataset_name, is_anomal))
-    mid_hook = ResNet.layer4[1].register_forward_hook(_get_activation(mid_layer_name, dataset_name, is_anomal))
-    shallow_hook = ResNet.layer4[0].register_forward_hook(_get_activation(shallow_layer_name, dataset_name, is_anomal))
-
-    final_shallow, final_mid, final_deep = torch.tensor([]), torch.tensor([]), torch.tensor([])
-    final_deep = final_deep.to(device)
-    final_shallow = final_shallow.to(device)
-    final_mid = final_mid.to(device)
+    for name, layer in names_and_layers_dict.items():
+        layer['hook'].register_forward_hook(_get_activation(name, dataset_name, is_anomal))
+        layer['activation'] = layer['activation'].to(device)
 
     count = 0
     for X, _ in tqdm(dataloader):
         X = X.to(device)
         count += 1
         _ = ResNet(X)
-        curr_shallow_act, curr_mid_act, curr_deep_act = activations[shallow_layer_name], activations[mid_layer_name], \
-                                                        activations[deep_layer_name]
-        final_deep = torch.cat((final_deep, curr_deep_act))
-        final_mid = torch.cat((final_mid, curr_mid_act))
-        final_shallow = torch.cat((final_shallow, curr_shallow_act))
-        if count % 10 == 0:  # saving every 10 iterations (=batches) and re-initializing
-            torch.save(final_deep, f'deep_activations/{dataset_name}_{test_or_train}_{anomal_suffix}_{count // 10}')
-            torch.save(final_mid, f'mid_activations/{dataset_name}_{test_or_train}_{anomal_suffix}_{count // 10}')
-            torch.save(final_shallow,
-                       f'shallow_activations/{dataset_name}_{test_or_train}_{anomal_suffix}_{count // 10}')
-            final_shallow, final_mid, final_deep = torch.tensor([]), torch.tensor([]), torch.tensor([])
-            final_deep = final_deep.to(device)
-            final_mid = final_mid.to(device)
-            final_shallow = final_shallow.to(device)
-    deep_hook.remove()
-    mid_hook.remove()
-    shallow_hook.remove()
+
+        curr_activations = {layer_name: activations[layer_name] for layer_name in names_and_layers_dict}
+        for name, layer in names_and_layers_dict.items():
+            layer['activation'] = torch.cat((layer['activation'], curr_activations[name]))
+
+        mod = 1 if dataset_name == 'mknet' else 10 # mknet is small so we save more frequent
+        if count % 1 == 0:  # saving every 10 iterations (=batches) and re-initializing
+            for name, layer in names_and_layers_dict.items():
+                torch.save(layer['activation'],
+                           f"{name}_activation/{dataset_name}_{test_or_train}_{anomal_suffix}_{count // 1}")
+                layer['activation'] = torch.tensor([])
+                layer['activation'] = layer['activation'].to(device)
 
 
 class ActivationDataset(Dataset):
@@ -140,7 +168,7 @@ class ActivationDataset(Dataset):
         self.test_or_train = test_or_train
         self.is_anomalous = is_anomalous
         self.anomal_suffix = "anomal" if is_anomalous else "regular"
-        all_files = os.listdir('deep_activations')  # just to get length
+        all_files = os.listdir('layer1_block0_activation')  # just to get length
         test_len = len(
             [t for t in all_files if 'test' in t and self.anomal_suffix in t])  # TODO: make sure this works
         train_len = len([t for t in all_files if 'train' in t])
@@ -151,13 +179,28 @@ class ActivationDataset(Dataset):
 
     def __getitem__(self, idx: int):
         if idx >= self.len: raise IndexError(f"idx={idx}>={self.len}=len")
-        deep_act = torch.load(
-            f"deep_activations/{self.dataset_name}_{self.test_or_train}_{self.anomal_suffix}_{idx + 1}")
-        deep_act = deep_act.to(device)
-        mid_act = torch.load(f"mid_activations/{self.dataset_name}_{self.test_or_train}_{self.anomal_suffix}_{idx + 1}")
-        mid_act = mid_act.to(device)
-        shallow_act = torch.load(
-            f"shallow_activations/{self.dataset_name}_{self.test_or_train}_{self.anomal_suffix}_{idx + 1}")
-        shallow_act = shallow_act.to(device)
-        return torch.nn.functional.normalize(shallow_act), torch.nn.functional.normalize(
-            mid_act), torch.nn.functional.normalize(deep_act)
+        activation_lst = []
+        for name in [f"{layer}_block{i}" for layer in ['layer1', 'layer2', 'layer3', 'layer4'] for i in [0, 1]] + [
+            'avgpool']:
+            activ = torch.load(
+                f"{name}_activation/{self.dataset_name}_{self.test_or_train}_{self.anomal_suffix}_{idx + 1}")
+            activ = activ.to(device)
+            activ = torch.nn.functional.normalize(activ)
+            activation_lst.append(activ)
+        return activation_lst
+
+
+class MVNetDataset(Dataset):
+    def __init__(self, root_dir, is_anomal):
+        self.root_dir = root_dir
+        self.items = os.listdir(root_dir)
+        self.is_anomal = is_anomal
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, idx):
+        im_path = self.items[idx]
+        im_obj = Image.open(f"{self.root_dir}/{im_path}")
+        im_transformed = greyscale_preprocess(im_obj)
+        return im_transformed, 1  # we return some redundant target 1 that is ignored just to stay consistent with other datasets

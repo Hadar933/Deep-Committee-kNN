@@ -57,40 +57,64 @@ def committee_kNN_from_all_files(k: int,
                                  test,
                                  dataset: str,
                                  is_anomalous: bool
-                                 ) -> Tuple[torch.Tensor, torch.Tensor]:
+                                 ):
     """
     :return: classifications of the test data
     """
-    shallow_ret, mid_ret, deep_ret = torch.tensor([], device=device), torch.tensor([], device=device), torch.tensor([],
-                                                                                                                    device=device)
-    for curr_test_shallow, curr_test_mid, curr_test_deep in tqdm(test):
-        curr_test_shallow = curr_test_shallow.to(device)
-        curr_test_mid = curr_test_mid.to(device)
-        curr_test_deep = curr_test_deep.to(device)
+    names_and_knns_dict = {
+        'layer1_block0': torch.tensor([], device=device),
+        'layer1_block1': torch.tensor([], device=device),
+
+        'layer2_block0': torch.tensor([], device=device),
+        'layer2_block1': torch.tensor([], device=device),
+
+        'layer3_block0': torch.tensor([], device=device),
+        'layer3_block1': torch.tensor([], device=device),
+
+        'layer4_block0': torch.tensor([], device=device),
+        'layer4_block1': torch.tensor([], device=device),
+
+        'avgpool': torch.tensor([], device=device)
+    }
+
+    for curr_test_activ_lst in tqdm(test):
+        curr_test_activ_lst = [curr_test_activ_lst[i].to(device) for i in range(len(curr_test_activ_lst))]
 
         # TODO: might not need indices here
-        knn_shallow = {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)}
-        knn_mid = {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)}
-        knn_deep = {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)}
+        knn_values = {
+            'layer1_block0': {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)},
+            'layer1_block1': {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)},
 
-        for curr_train_shallow, curr_train_mid, curr_train_deep in tqdm(train):
-            curr_train_shallow = curr_train_shallow.to(device)
-            curr_train_mid = curr_train_mid.to(device)
-            curr_train_deep = curr_train_deep.to(device)
+            'layer2_block0': {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)},
+            'layer2_block1': {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)},
 
-            _calc_current_knn_and_append(curr_train_shallow, curr_test_shallow, knn_shallow, k, True)
-            _calc_current_knn_and_append(curr_train_mid, curr_test_mid, knn_mid, k, True)
-            _calc_current_knn_and_append(curr_train_deep, curr_test_deep, knn_deep, k, False)
+            'layer3_block0': {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)},
+            'layer3_block1': {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)},
 
-        shallow_ret = torch.cat((shallow_ret, _get_predictions(knn_shallow, k)))
-        mid_ret = torch.cat((mid_ret, _get_predictions(knn_mid, k)))
-        deep_ret = torch.cat((deep_ret, _get_predictions(knn_deep, k)))
+            'layer4_block0': {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)},
+            'layer4_block1': {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)},
+
+            'avgpool': {'values': torch.tensor([], device=device), 'indices': torch.tensor([], device=device)},
+        }
+
+        for curr_train_activ_lst in tqdm(train):
+            curr_train_activ_lst = [curr_train_activ_lst[i].to(device) for i in range(len(curr_train_activ_lst))]
+            count_last_activ = 0
+            for train_activ, test_activ, knn_dict in zip(curr_train_activ_lst, curr_test_activ_lst,
+                                                         knn_values.values()):
+                count_last_activ += 1
+                is_deep = True if count_last_activ < 8 else False  # only last layer is deep and we have 9 layers
+                _calc_current_knn_and_append(train_activ, test_activ, knn_dict, k, is_deep)
+            count_last_activ = 0
+
+        for name, knn in names_and_knns_dict.items():
+            names_and_knns_dict[name] = torch.cat((names_and_knns_dict[name], _get_predictions(knn_values[name], k)))
 
     anomal_suffix = "anomal" if is_anomalous else "regular"
-    torch.save(deep_ret, f'predictions/deep_{dataset}_{anomal_suffix}')
-    torch.save(mid_ret, f'predictions/mid_{dataset}_{anomal_suffix}')
-    torch.save(shallow_ret, f'predictions/shallow_{dataset}_{anomal_suffix}')
-    return shallow_ret, mid_ret, deep_ret
+    for name, knn in names_and_knns_dict.items():
+        torch.save(knn, f"predictions/{name}_{dataset}_{anomal_suffix}")
+
+    return names_and_knns_dict
 
 
 def classify_based_on_knn_distance(thresholds) -> Tuple[Dict[str, torch.ByteTensor], Dict[str, torch.ByteTensor]]:

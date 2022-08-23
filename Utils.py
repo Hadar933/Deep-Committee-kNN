@@ -2,8 +2,7 @@ import torch
 from torchvision import transforms
 import os
 import gc
-from tabulate import tabulate
-
+import shutil
 
 gc.collect()
 torch.cuda.empty_cache()
@@ -18,9 +17,9 @@ batch_size = 100
 ANOMAL_DATASETS = ['mnist', 'caltech101']  # add more if needed...
 
 if not os.path.isdir('predictions'): os.mkdir('predictions')
-if not os.path.isdir('deep_activations'): os.mkdir('deep_activations')
-if not os.path.isdir('shallow_activations'): os.mkdir('shallow_activations')
-if not os.path.isdir('mid_activations'): os.mkdir('mid_activations')
+for act in [f"{layer}_block{i}_activation" for layer in ['layer1', 'layer2', 'layer3', 'layer4'] for i in [0, 1]] + [
+    'avgpool_activation']:
+    if not os.path.isdir(act): os.mkdir(act)
 
 greyscale_preprocess = transforms.Compose([
     transforms.Resize(256),
@@ -60,3 +59,13 @@ def score_prediction(anomal_pred, reg_pred):
     #                headers=['Pred/Real', 'Regular (P)', 'Anomal (N)']))
 
     return len(TP), len(FP), len(TN), len(FN)
+
+
+def clear_dir():
+    """
+    deletes all directories of activations / predictions
+    """
+    for item in os.listdir():
+        if item != 'config' and item != 'data':
+            shutil.rmtree(item)
+
