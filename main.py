@@ -84,7 +84,7 @@ def load_activations(anomal_class, reg_class, to_cpu: bool):
     return anomal_act, regular_act
 
 
-def get_roc_curve(anomal_class: str, reg_class: str):
+def get_roc_curve(anomal_class: str, reg_class: str, use_knn_sum: bool):
     anomal_act, regular_act = load_activations(anomal_class, reg_class, True)
 
     anomal_size, regular_size = anomal_act['layer1_block0'].shape, regular_act['layer1_block0'].shape
@@ -95,7 +95,14 @@ def get_roc_curve(anomal_class: str, reg_class: str):
     for layer_name in [f"layer{j}_block{i}" for j in [1, 2, 3, 4] for i in [0, 1]] + ['avgpool']:
         knn_dist = torch.cat((anomal_act[layer_name], regular_act[layer_name]))
         layers_knn_dict[layer_name] = knn_dist
-
+    if use_knn_sum:
+        final_knn = 0
+        for knn in layers_knn_dict.values():
+            final_knn += knn
+        final_fpr, final_tpr, final_thres = roc_curve(y_true, final_knn)
+        best_threshold = final_thres[np.argmin(final_fpr ** 2 + (1 - final_tpr) ** 2)]
+        y_pred = torch.where(final_knn <= best_threshold, 0, 1)
+        # TODO: continue from here !!
     prediction_dict = {}
     tpr_dict = {}
     fpr_dict = {}
@@ -104,8 +111,8 @@ def get_roc_curve(anomal_class: str, reg_class: str):
         fpr, tpr, thresholds = roc_curve(y_true, knn)
 
         # Now, we know that the best point on the TPR-vs-FPR curve is (x,y) = (FPR,TPR) = (0,1)
-        # we will chose the threshold that corresponds to the point that is closest to (0,1), i.e the point (x,y) for which
-        # sqrt(x^2+(y-1)^2) is minimal, and use this to extract the threshold (we do not take sqrt as this is redundant):
+        # we will chose the threshold that corresponds to the point that is closest to (0,1), i.e the point (x,y) for
+        # which sqrt(x^2+(y-1)^2) is minimal, and use this to extract the threshold (taking sqrt is redundant):
         best_threshold = thresholds[np.argmin(fpr ** 2 + (1 - tpr) ** 2)]
 
         # based on the threshold we generate a prediction - 1 = anomal, 0 = regular:
@@ -186,7 +193,7 @@ def main(args):
 
     if visualize: visualize_results(anomalous_class, regular_class, k, test_size)
 
-    if do_ROC: get_roc_curve(anomalous_class, regular_class)
+    if do_ROC: get_roc_curve(anomalous_class, regular_class, True)
 
 
 if __name__ == '__main__':
