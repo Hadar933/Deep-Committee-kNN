@@ -43,22 +43,16 @@ def load_activation_dataloaders(calc_activations: bool,
     return reg_train_activations_loader, reg_test_activations_loader, anomal_test_activations_loader
 
 
-def visualize_results(anomal_class: str, reg_class: str, k: int, test_size):
-    deep_anomal, deep_reg, mid_anomal, mid_reg, shal_anomal, shal_reg = load_activations(anomal_class, reg_class)
-
-    x = range(test_size)
-
-    for activ in ['S', 'M', 'D']:
-        reg_plot = shal_reg if activ == 'S' else mid_reg if activ == 'M' else deep_reg
-        anomal_plot = shal_anomal if activ == 'S' else mid_anomal if activ == 'M' else deep_anomal
-        reg_plot = reg_plot.cpu().numpy()
-        anomal_plot = anomal_plot.cpu().numpy()
-
-        plt.scatter(x, reg_plot, s=0.3)
-        plt.scatter(x, anomal_plot, s=0.3)
-        plt.title(f"{activ} Activations")
-        plt.xlabel("# Sample")
+def visualize_results(anomal_class: str, reg_class: str, k: int):
+    anomal_act, regular_act = load_activations(anomal_class, reg_class, True)
+    for name, anomal, regular in zip(anomal_act, anomal_act.values(), regular_act.values()):
+        anomal = anomal.cpu().numpy()
+        regular = regular.cpu().numpy()
+        plt.scatter(range(len(anomal)), anomal, s=0.3)
+        plt.scatter(range(len(regular)), regular, s=0.3)
+        plt.title(name)
         plt.ylabel(f"Mean kNN distance from k={k} neighbours")
+        plt.xlabel("# Sample")
         plt.legend([reg_class, anomal_class])
         plt.show()
 
@@ -102,7 +96,9 @@ def get_roc_curve(anomal_class: str, reg_class: str, use_knn_sum: bool):
         final_fpr, final_tpr, final_thres = roc_curve(y_true, final_knn)
         best_threshold = final_thres[np.argmin(final_fpr ** 2 + (1 - final_tpr) ** 2)]
         y_pred = torch.where(final_knn <= best_threshold, 0, 1)
-        # TODO: continue from here !!
+        print(f"ROC score = {roc_auc_score(y_true, y_pred)}")
+        return
+
     prediction_dict = {}
     tpr_dict = {}
     fpr_dict = {}
@@ -149,21 +145,21 @@ def main(args):
     k = 2
     train_size = 1000
     test_size = 1000
-    regular_class = 'mknet'
-    anomalous_class = 'mknet'
+    regular_class = 'mnistcls'
+    anomalous_class = 'mnist'
 
-    use_retinal_dataset = True
+    use_mvtec_dataset = False
 
     calc_reg_activation = True
     calc_anomal_activation = True
 
-    use_one_vs_other = False
+    use_one_vs_other = True
     args = args if use_one_vs_other else None
 
     calculate_knn = True
     calculate_knn_anomalous = True
 
-    visualize = False
+    visualize = True
 
     do_ROC = True
 
@@ -185,16 +181,16 @@ def main(args):
 
     reg_train, reg_test, anomal_test = load_activation_dataloaders(calc_reg_activation, calc_anomal_activation,
                                                                    anomalous_class, regular_class, train_size,
-                                                                   test_size, use_one_vs_other, use_retinal_dataset,
+                                                                   test_size, use_one_vs_other, use_mvtec_dataset,
                                                                    args)
 
     if calculate_knn: committee_kNN_from_all_files(k, reg_train, reg_test, regular_class, False)
     if calculate_knn_anomalous: committee_kNN_from_all_files(k, reg_train, anomal_test, anomalous_class, True)
 
-    if visualize: visualize_results(anomalous_class, regular_class, k, test_size)
+    if visualize: visualize_results(anomalous_class, regular_class, k)
 
     if do_ROC: get_roc_curve(anomalous_class, regular_class, True)
 
 
 if __name__ == '__main__':
-    main(0)
+    main(3)

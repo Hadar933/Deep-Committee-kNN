@@ -56,14 +56,14 @@ def load_dataloaders(train_size: int, test_size: int, anomal_class: str, reg_cla
     elif mv_net:
         # in this case we ignore input sizes and set it up manually:
         reg_mvnet = MVNetDataset(
-            "G:\\My Drive\\Master\\Year 1\\Applied Deep Learning\\Deep-Committee-kNN\\transistor\\NORMAL", False)
+            "G:\\My Drive\\Master\\Year 1\\Applied Deep Learning\\Deep-Committee-kNN\\MVTec\\grid\\NORMAL", False)
         reg_mvnet_train_size = int(0.8 * len(reg_mvnet))
         reg_mvnet_test_size = len(reg_mvnet) - reg_mvnet_train_size
 
         reg_train_data, reg_test_data = torch.utils.data.random_split(reg_mvnet, [reg_mvnet_train_size, reg_mvnet_test_size])
 
         anomal_test_data = MVNetDataset(
-            "G:\\My Drive\\Master\\Year 1\\Applied Deep Learning\\Deep-Committee-kNN\\transistor\\ANOMAL", True)
+            "G:\\My Drive\\Master\\Year 1\\Applied Deep Learning\\Deep-Committee-kNN\\MVTec\\grid\\ANOMAL", True)
         if len(reg_train_data) > train_size:
             reg_train_data = torch.utils.data.Subset(reg_train_data, range(0, train_size))
         if len(reg_test_data) > test_size:
